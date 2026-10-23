@@ -4,6 +4,9 @@ import winreg
 from pathlib import Path
 import ctypes
 
+IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".avif"]
+APPLIES_TO_FILTER = " OR ".join([f"System.FileExtension:={ext}" for ext in IMAGE_EXTENSIONS])
+
 def notify_shell_associations_changed():
     """Notifies Windows Explorer that file associations have been updated."""
     try:
@@ -36,57 +39,97 @@ def create_shortcut(target_exe: Path, shortcut_path: Path, description: str = "S
 
 def register_open_with(target_exe: Path):
     """
-    Registers SizeWiz in Windows HKCU registry for Open With and image file associations.
+    Registers SizeWiz in Windows HKCU registry for:
+    1. Direct Right-Click Context Menu ("Resize with SizeWiz") on 1 or more images.
+    2. MultiSelectModel="Player" so selecting multiple images never hides the menu item.
+    3. Windows "Open with" recommended applications list.
     """
     exe_str = f'"{str(target_exe)}" "%1"'
-    formats = [".jpg", ".jpeg", ".png", ".webp", ".avif"]
+    icon_str = f'"{str(target_exe)}",0'
 
-    # 1. Applications key
+    # --- 1. Direct Context Menu for All Images via SystemFileAssociations ---
+    sfa_shell_path = r"Software\Classes\SystemFileAssociations\image\shell\SizeWiz"
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, sfa_shell_path) as key:
+        winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
+        winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon_str)
+        # MultiSelectModel="Player" ensures the context menu is NOT hidden when multiple files are selected!
+        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
+
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{sfa_shell_path}\command") as key:
+        winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
+
+    # --- 2. Direct Context Menu via *\shell with AQS Filter (Only shows on images) ---
+    all_shell_path = r"Software\Classes\*\shell\SizeWiz"
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, all_shell_path) as key:
+        winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
+        winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon_str)
+        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
+        # AppliesTo ensures this entry ONLY shows up when images are selected, avoiding clutter on other files
+        winreg.SetValueEx(key, "AppliesTo", 0, winreg.REG_SZ, APPLIES_TO_FILTER)
+
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{all_shell_path}\command") as key:
+        winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
+
+    # --- 3. Applications Key (For Open With list and Default Programs) ---
     app_base = r"Software\Classes\Applications\SizeWiz.exe"
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, app_base) as key:
         winreg.SetValueEx(key, "FriendlyAppName", 0, winreg.REG_SZ, "SizeWiz")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{app_base}\DefaultIcon") as key:
-        winreg.SetValue(key, "", winreg.REG_SZ, f'"{str(target_exe)}",0')
+        winreg.SetValue(key, "", winreg.REG_SZ, icon_str)
+
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{app_base}\shell\open") as key:
+        winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
+        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{app_base}\shell\open\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
 
-    # Supported Types
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{app_base}\SupportedTypes") as key:
-        for ext in formats:
+        for ext in IMAGE_EXTENSIONS:
             winreg.SetValueEx(key, ext, 0, winreg.REG_SZ, "")
 
-    # 2. SystemFileAssociations for all images
-    sfa_key_path = r"Software\Classes\SystemFileAssociations\image\OpenWithList\SizeWiz.exe"
-    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, sfa_key_path) as key:
+    # SystemFileAssociations OpenWithList
+    sfa_owl_path = r"Software\Classes\SystemFileAssociations\image\OpenWithList\SizeWiz.exe"
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, sfa_owl_path) as key:
         winreg.SetValue(key, "", winreg.REG_SZ, "")
 
-    # 3. SizeWiz.Image ProgID
+    # --- 4. Per-Extension Registrations ---
+    for ext in IMAGE_EXTENSIONS:
+        # Per-extension SystemFileAssociations shell
+        ext_sfa_shell = rf"Software\Classes\SystemFileAssociations\{ext}\shell\SizeWiz"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, ext_sfa_shell) as key:
+            winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
+            winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon_str)
+            winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
+
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{ext_sfa_shell}\command") as key:
+            winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
+
+        # OpenWithProgids & OpenWithList
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{ext}\OpenWithProgids") as key:
+            winreg.SetValueEx(key, "SizeWiz.Image", 0, winreg.REG_SZ, "")
+
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{ext}\OpenWithList\SizeWiz.exe") as key:
+            winreg.SetValue(key, "", winreg.REG_SZ, "")
+
+    # --- 5. SizeWiz.Image ProgID ---
     progid_path = r"Software\Classes\SizeWiz.Image"
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, progid_path) as key:
         winreg.SetValue(key, "", winreg.REG_SZ, "SizeWiz Image File")
         winreg.SetValueEx(key, "FriendlyTypeName", 0, winreg.REG_SZ, "SizeWiz Image File")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{progid_path}\DefaultIcon") as key:
-        winreg.SetValue(key, "", winreg.REG_SZ, f'"{str(target_exe)}",0')
+        winreg.SetValue(key, "", winreg.REG_SZ, icon_str)
+
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{progid_path}\shell\open") as key:
+        winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
+        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{progid_path}\shell\open\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
 
-    # 4. Bind ProgID & OpenWithList to extensions
-    for ext in formats:
-        # OpenWithProgids
-        ext_progid_path = rf"Software\Classes\{ext}\OpenWithProgids"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, ext_progid_path) as key:
-            winreg.SetValueEx(key, "SizeWiz.Image", 0, winreg.REG_SZ, "")
-
-        # OpenWithList
-        ext_owl_path = rf"Software\Classes\{ext}\OpenWithList\SizeWiz.exe"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, ext_owl_path) as key:
-            winreg.SetValue(key, "", winreg.REG_SZ, "")
-
-    # Notify Windows Explorer
+    # Notify Windows Explorer of shell updates
     notify_shell_associations_changed()
 
 def register_uninstall_entry(target_dir: Path, target_exe: Path):
@@ -106,8 +149,6 @@ def register_uninstall_entry(target_dir: Path, target_exe: Path):
 
 def unregister_all():
     """Removes all SizeWiz registry entries cleanly."""
-    formats = [".jpg", ".jpeg", ".png", ".webp", ".avif"]
-
     def delete_key_tree(root, subkey):
         try:
             with winreg.OpenKey(root, subkey, 0, winreg.KEY_ALL_ACCESS) as k:
@@ -121,7 +162,7 @@ def unregister_all():
         except OSError:
             pass
 
-    for ext in formats:
+    for ext in IMAGE_EXTENSIONS:
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{ext}\OpenWithProgids", 0, winreg.KEY_SET_VALUE) as key:
                 try:
@@ -132,9 +173,13 @@ def unregister_all():
             pass
 
         delete_key_tree(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{ext}\OpenWithList\SizeWiz.exe")
+        delete_key_tree(winreg.HKEY_CURRENT_USER, rf"Software\Classes\SystemFileAssociations\{ext}\shell\SizeWiz")
+        delete_key_tree(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{ext}\shell\SizeWiz")
 
-    delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\Applications\SizeWiz.exe")
+    delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\*\shell\SizeWiz")
+    delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\SystemFileAssociations\image\shell\SizeWiz")
     delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\SystemFileAssociations\image\OpenWithList\SizeWiz.exe")
+    delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\Applications\SizeWiz.exe")
     delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\SizeWiz.Image")
     delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall\SizeWiz")
 

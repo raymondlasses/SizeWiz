@@ -230,6 +230,14 @@ class SetupWizard(ctk.CTk):
             target_dir.mkdir(parents=True, exist_ok=True)
             target_exe = target_dir / "SizeWiz.exe"
 
+            # If re-installing, ensure any previous running SizeWiz instance is closed so files can be overwritten cleanly
+            try:
+                import subprocess
+                subprocess.run(["taskkill", "/F", "/IM", "SizeWiz.exe"], capture_output=True)
+                time.sleep(0.2)
+            except Exception:
+                pass
+
             # Check for fast pre-extracted payload zip (zero temp decompression on subsequent runs)
             meipass = getattr(sys, "_MEIPASS", None)
             base_search = Path(meipass) if meipass else self.source_dir
