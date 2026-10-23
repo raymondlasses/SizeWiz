@@ -24,6 +24,14 @@ def main():
         perform_uninstall(app_dir)
         return
 
+    # Set explicit AppUserModelID so Windows taskbar binds to SizeWiz shortcut/icon
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SizeWiz.ImageResizer.1.0")
+        except Exception:
+            pass
+
     # Collect any image files passed as arguments
     incoming_files = [arg for arg in sys.argv[1:] if os.path.exists(arg)]
 

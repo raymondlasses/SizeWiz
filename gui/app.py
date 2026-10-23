@@ -25,9 +25,38 @@ WINDOW_WIDTH = 340
 WINDOW_HEIGHT = 320
 
 
+def get_icon_path() -> Optional[Path]:
+    """Finds icon.ico whether running from source, onedir, or onefile bundle."""
+    candidates = []
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidates.append(Path(meipass) / "assets" / "icon.ico")
+        candidates.append(Path(meipass) / "icon.ico")
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        candidates.append(exe_dir / "assets" / "icon.ico")
+        candidates.append(exe_dir / "icon.ico")
+    root_dir = Path(__file__).resolve().parent.parent
+    candidates.append(root_dir / "assets" / "icon.ico")
+    candidates.append(root_dir / "icon.ico")
+
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
+
 class SizeWizApp(ctk.CTk, TkinterDnD.DnDWrapper if HAS_TKDND else object):
     def __init__(self, initial_files: Optional[List[str]] = None):
         super().__init__()
+
+        # Apply application icon
+        icon_path = get_icon_path()
+        if icon_path:
+            try:
+                self.iconbitmap(str(icon_path))
+            except Exception:
+                pass
 
         # Initialize TkinterDnD OLE subsystem
         self.has_dnd = False
@@ -492,15 +521,33 @@ class SizeWizApp(ctk.CTk, TkinterDnD.DnDWrapper if HAS_TKDND else object):
         thread.start()
 
     def _process_batch_thread(self, files: List[Path], mode: str, w: Optional[int], h: Optional[int], bundle: bool):
+        from concurrent.futures import ThreadPoolExecutor
+
         resized_count = 0
         skipped_count = 0
 
-        for f in files:
-            res = process_image(f, mode, w, h, bundle_in_folder=bundle)
+        if len(files) == 1:
+            res = process_image(files[0], mode, w, h, bundle_in_folder=bundle)
             if res.status == "resized":
-                resized_count += 1
+                resized_count = 1
             elif res.status == "skipped":
-                skipped_count += 1
+                skipped_count = 1
+        else:
+            max_workers = min(len(files), os.cpu_count() or 4)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(process_image, f, mode, w, h, bundle_in_folder=bundle)
+                    for f in files
+                ]
+                for future in futures:
+                    try:
+                        res = future.result()
+                        if res.status == "resized":
+                            resized_count += 1
+                        elif res.status == "skipped":
+                            skipped_count += 1
+                    except Exception:
+                        pass
 
         self.after(0, lambda: self._on_batch_complete(resized_count, skipped_count, len(files)))
 

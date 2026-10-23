@@ -17,6 +17,11 @@ def notify_shell_associations_changed():
         pass
 
 def create_shortcut(target_exe: Path, shortcut_path: Path, description: str = "SizeWiz Image Resizer"):
+    icon_file = target_exe.parent / "icon.ico"
+    if not icon_file.exists():
+        icon_file = target_exe.parent / "assets" / "icon.ico"
+    icon_loc = str(icon_file) if icon_file.exists() else str(target_exe)
+
     try:
         import win32com.client
         shell = win32com.client.Dispatch("WScript.Shell")
@@ -24,7 +29,7 @@ def create_shortcut(target_exe: Path, shortcut_path: Path, description: str = "S
         shortcut.TargetPath = str(target_exe)
         shortcut.WorkingDirectory = str(target_exe.parent)
         shortcut.Description = description
-        shortcut.IconLocation = str(target_exe)
+        shortcut.IconLocation = icon_loc
         shortcut.Save()
     except Exception:
         import subprocess
@@ -33,6 +38,7 @@ def create_shortcut(target_exe: Path, shortcut_path: Path, description: str = "S
             f"$s = $ws.CreateShortcut('{str(shortcut_path)}'); "
             f"$s.TargetPath = '{str(target_exe)}'; "
             f"$s.WorkingDirectory = '{str(target_exe.parent)}'; "
+            f"$s.IconLocation = '{icon_loc}'; "
             f"$s.Save()"
         )
         subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], check=False)
@@ -52,7 +58,15 @@ def register_open_with(target_exe: Path):
     4. Windows SendTo shortcut.
     """
     exe_str = f'"{str(target_exe)}" "%1"'
-    icon_str = f'"{str(target_exe)}",0'
+    
+    icon_file = target_exe.parent / "icon.ico"
+    if not icon_file.exists():
+        icon_file = target_exe.parent / "assets" / "icon.ico"
+    
+    if icon_file.exists():
+        icon_str = f'"{str(icon_file)}"'
+    else:
+        icon_str = f'"{str(target_exe)}",0'
 
     # --- 1. Direct Context Menu for All Images via SystemFileAssociations ---
     sfa_shell_path = r"Software\Classes\SystemFileAssociations\image\shell\SizeWiz"
@@ -146,6 +160,11 @@ def register_uninstall_entry(target_dir: Path, target_exe: Path):
     """
     Adds SizeWiz to Windows 'Installed Apps' / 'Add or Remove Programs' in Control Panel / Settings.
     """
+    icon_file = target_dir / "icon.ico"
+    if not icon_file.exists():
+        icon_file = target_dir / "assets" / "icon.ico"
+    display_icon = f'"{str(icon_file)}"' if icon_file.exists() else f'"{str(target_exe)}",0'
+
     uninstall_key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\SizeWiz"
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, uninstall_key_path) as key:
         winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, "SizeWiz")
@@ -153,7 +172,7 @@ def register_uninstall_entry(target_dir: Path, target_exe: Path):
         winreg.SetValueEx(key, "Publisher", 0, winreg.REG_SZ, "SizeWiz")
         winreg.SetValueEx(key, "InstallLocation", 0, winreg.REG_SZ, str(target_dir))
         winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, f'"{str(target_exe)}" --uninstall')
-        winreg.SetValueEx(key, "DisplayIcon", 0, winreg.REG_SZ, f'"{str(target_exe)}",0')
+        winreg.SetValueEx(key, "DisplayIcon", 0, winreg.REG_SZ, display_icon)
         winreg.SetValueEx(key, "NoModify", 0, winreg.REG_DWORD, 1)
         winreg.SetValueEx(key, "NoRepair", 0, winreg.REG_DWORD, 1)
 

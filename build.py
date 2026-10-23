@@ -28,6 +28,11 @@ def main():
     root_dir = Path(__file__).resolve().parent
     dist_dir = root_dir / "dist"
     build_dir = root_dir / "build"
+    icon_file = root_dir / "assets" / "icon.ico"
+    assets_dir = root_dir / "assets"
+
+    icon_flag = f'--icon "{str(icon_file)}" ' if icon_file.exists() else ''
+    assets_data = f'--add-data "{str(assets_dir)};assets" ' if assets_dir.exists() else ''
 
     # Step 1: Clean previous build artifacts
     print("[*] Cleaning build/dist directories...")
@@ -38,12 +43,14 @@ def main():
 
     # Step 2: Build SizeWiz native fast directory (for instant ~200ms launch)
     cmd_onedir = (
-        'pyinstaller --noconfirm --onedir --windowed '
-        '--name "SizeWiz" '
-        '--collect-all customtkinter '
-        '--collect-all tkinterdnd2 '
-        '--collect-all PIL '
-        'main.py'
+        f'pyinstaller --noconfirm --onedir --windowed '
+        f'{icon_flag}'
+        f'{assets_data}'
+        f'--name "SizeWiz" '
+        f'--collect-all customtkinter '
+        f'--collect-all tkinterdnd2 '
+        f'--collect-all PIL '
+        f'main.py'
     )
     run_cmd(cmd_onedir, "Compiling SizeWiz Native Fast Directory")
 
@@ -52,6 +59,14 @@ def main():
         print(f"[!] SizeWiz directory not found at {sizewiz_dir}")
         sys.exit(1)
 
+    # Ensure icon is in sizewiz_dir for payload
+    if icon_file.exists():
+        shutil.copy2(icon_file, sizewiz_dir / "icon.ico")
+        (sizewiz_dir / "assets").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(icon_file, sizewiz_dir / "assets" / "icon.ico")
+        if (assets_dir / "icon.png").exists():
+            shutil.copy2(assets_dir / "icon.png", sizewiz_dir / "assets" / "icon.png")
+
     # Zip the fast application directory into payload for installer
     print("[*] Packaging fast payload zip for setup wizard...")
     payload_zip = dist_dir / "sizewiz_payload.zip"
@@ -59,12 +74,14 @@ def main():
 
     # Step 3: Also build standalone portable single-file SizeWiz.exe
     cmd_onefile = (
-        'pyinstaller --noconfirm --onefile --windowed '
-        '--name "SizeWiz_Portable" '
-        '--collect-all customtkinter '
-        '--collect-all tkinterdnd2 '
-        '--collect-all PIL '
-        'main.py'
+        f'pyinstaller --noconfirm --onefile --windowed '
+        f'{icon_flag}'
+        f'{assets_data}'
+        f'--name "SizeWiz_Portable" '
+        f'--collect-all customtkinter '
+        f'--collect-all tkinterdnd2 '
+        f'--collect-all PIL '
+        f'main.py'
     )
     run_cmd(cmd_onefile, "Compiling SizeWiz Portable Single-File")
 
@@ -72,6 +89,8 @@ def main():
     setup_name = f"SizeWiz_{VERSION}_Setup"
     cmd_setup = (
         f'pyinstaller --noconfirm --onefile --windowed '
+        f'{icon_flag}'
+        f'{assets_data}'
         f'--name "{setup_name}" '
         f'--paths . '
         f'--collect-all customtkinter '

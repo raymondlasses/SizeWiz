@@ -16,16 +16,21 @@ class ResizeResult(NamedTuple):
 
 class BaseResizerEngine(ABC):
     @abstractmethod
-    def resize(self, image: Any, target_size: Tuple[int, int]) -> Any:
+    def resize(self, image: Any, target_size: Tuple[int, int], mode: str = "downscale") -> Any:
         """Resize the given PIL Image to the target size."""
         pass
 
 
 class LanczosResizerEngine(BaseResizerEngine):
-    """High-precision sinc-windowed Lanczos resampling engine."""
-    def resize(self, image: Any, target_size: Tuple[int, int]) -> Any:
+    """
+    Adaptive high-precision resampling engine:
+    - Downscale: Lanczos (8-tap sinc filter for maximum anti-aliasing and sharpness)
+    - Upscale: Bicubic (smooth, natural expansion without ringing artifacts, 2x faster)
+    """
+    def resize(self, image: Any, target_size: Tuple[int, int], mode: str = "downscale") -> Any:
         from PIL import Image
-        return image.resize(target_size, Image.Resampling.LANCZOS)
+        filter_type = Image.Resampling.BICUBIC if mode == "upscale" else Image.Resampling.LANCZOS
+        return image.resize(target_size, filter_type)
 
 
 class AIResizerEngine(BaseResizerEngine):
@@ -33,9 +38,10 @@ class AIResizerEngine(BaseResizerEngine):
     def __init__(self, model_path: Optional[str] = None):
         self.model_path = model_path
 
-    def resize(self, image: Any, target_size: Tuple[int, int]) -> Any:
+    def resize(self, image: Any, target_size: Tuple[int, int], mode: str = "downscale") -> Any:
         from PIL import Image
-        return image.resize(target_size, Image.Resampling.LANCZOS)
+        filter_type = Image.Resampling.BICUBIC if mode == "upscale" else Image.Resampling.LANCZOS
+        return image.resize(target_size, filter_type)
 
 
 def calculate_target_dimensions(
@@ -184,7 +190,7 @@ def process_image(
                 return ResizeResult(source_path, None, "skipped", orig_size, None)
 
             # Perform the resize
-            resized_img = engine.resize(img, target_size)
+            resized_img = engine.resize(img, target_size, mode=mode)
 
             output_path = get_available_output_path(source_path, mode, bundle_in_folder)
 
@@ -196,7 +202,7 @@ def process_image(
                 save_kwargs["exif"] = exif
 
             if ext in {".jpg", ".jpeg"}:
-                save_kwargs.update({"quality": 95, "optimize": True})
+                save_kwargs.update({"quality": 95})
                 if resized_img.mode in ("RGBA", "LA", "P"):
                     # Flatten alpha onto pure white background for JPEG
                     bg = Image.new("RGB", resized_img.size, (255, 255, 255))
@@ -206,9 +212,11 @@ def process_image(
                 elif resized_img.mode != "RGB":
                     resized_img = resized_img.convert("RGB")
             elif ext == ".png":
-                save_kwargs.update({"optimize": True})
+                # Standard fast zlib compression (lossless, up to 6x faster than exhaustive optimize=True)
+                save_kwargs.update({"compress_level": 6})
             elif ext == ".webp":
-                save_kwargs.update({"quality": 95, "method": 6})
+                # Method 4 provides optimal balance of visual fidelity and high-speed encoding
+                save_kwargs.update({"quality": 95, "method": 4})
             elif ext == ".avif":
                 save_kwargs.update({"quality": 95})
 

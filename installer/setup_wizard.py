@@ -41,6 +41,20 @@ except ImportError:
 ctk.set_appearance_mode("system")
 ctk.set_default_color_theme("blue")
 
+def get_installer_icon_path():
+    candidates = []
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidates.append(Path(meipass) / "assets" / "icon.ico")
+        candidates.append(Path(meipass) / "icon.ico")
+    root_dir = Path(__file__).resolve().parent.parent
+    candidates.append(root_dir / "assets" / "icon.ico")
+    candidates.append(root_dir / "icon.ico")
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
 def get_default_install_dir() -> Path:
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
@@ -71,10 +85,24 @@ class SetupWizard(ctk.CTk):
         super().__init__()
         self.source_dir = source_dir
 
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SizeWiz.Installer.1.0")
+            except Exception:
+                pass
+
+        icon_path = get_installer_icon_path()
+        if icon_path:
+            try:
+                self.iconbitmap(str(icon_path))
+            except Exception:
+                pass
+
         self.title("")
-        self.geometry("420x480")
+        self.geometry("420x485")
         self.resizable(False, False)
-        self._center_window(420, 480)
+        self._center_window(420, 485)
         self.after(50, self._apply_dwm)
 
         self._build_ui()
@@ -185,7 +213,17 @@ class SetupWizard(ctk.CTk):
             checkbox_width=18,
             checkbox_height=18
         )
-        self.cb_open_with.pack(side="top", anchor="w", pady=(0, 6))
+        self.cb_open_with.pack(side="top", anchor="w", pady=(0, 4))
+
+        # Tip for multi-file right-click in Windows 11
+        self.tip_label = ctk.CTkLabel(
+            container,
+            text="💡 Tip: Hold Shift + Right-Click to resize multiple images together",
+            font=ctk.CTkFont(family="Segoe UI", size=10),
+            text_color="#888888",
+            anchor="w"
+        )
+        self.tip_label.pack(side="top", fill="x", pady=(0, 6))
 
         self.cb_start_menu = ctk.CTkCheckBox(
             container,
@@ -259,6 +297,18 @@ class SetupWizard(ctk.CTk):
                         shutil.copytree(item, dest, dirs_exist_ok=True)
                     elif item.is_file():
                         shutil.copy2(item, dest)
+
+            # Ensure icon.ico exists in target_dir
+            target_icon = target_dir / "icon.ico"
+            if not target_icon.exists():
+                src_icon = base_search / "assets" / "icon.ico"
+                if not src_icon.exists():
+                    src_icon = base_search / "icon.ico"
+                if src_icon.exists():
+                    try:
+                        shutil.copy2(src_icon, target_icon)
+                    except Exception:
+                        pass
 
             # Register Open With
             if self.open_with_var.get():
