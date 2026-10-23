@@ -37,12 +37,17 @@ def create_shortcut(target_exe: Path, shortcut_path: Path, description: str = "S
         )
         subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], check=False)
 
+def safe_delete_value(key, val_name):
+    try:
+        winreg.DeleteValue(key, val_name)
+    except OSError:
+        pass
+
 def register_open_with(target_exe: Path):
     """
     Registers SizeWiz in Windows HKCU registry for:
-    1. Direct Right-Click Context Menu ("Resize with SizeWiz") on 1 or more images.
-    2. MultiSelectModel="Player" so selecting multiple images never hides the menu item.
-    3. Windows "Open with" recommended applications list.
+    1. Direct Right-Click Context Menu ("Resize with SizeWiz").
+    2. Windows "Open with" recommended applications list.
     """
     exe_str = f'"{str(target_exe)}" "%1"'
     icon_str = f'"{str(target_exe)}",0'
@@ -52,8 +57,7 @@ def register_open_with(target_exe: Path):
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, sfa_shell_path) as key:
         winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
         winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon_str)
-        # MultiSelectModel="Player" ensures the context menu is NOT hidden when multiple files are selected!
-        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
+        safe_delete_value(key, "MultiSelectModel")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{sfa_shell_path}\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
@@ -63,9 +67,8 @@ def register_open_with(target_exe: Path):
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, all_shell_path) as key:
         winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
         winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon_str)
-        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
-        # AppliesTo ensures this entry ONLY shows up when images are selected, avoiding clutter on other files
         winreg.SetValueEx(key, "AppliesTo", 0, winreg.REG_SZ, APPLIES_TO_FILTER)
+        safe_delete_value(key, "MultiSelectModel")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{all_shell_path}\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
@@ -80,7 +83,7 @@ def register_open_with(target_exe: Path):
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{app_base}\shell\open") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
-        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
+        safe_delete_value(key, "MultiSelectModel")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{app_base}\shell\open\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
@@ -96,17 +99,15 @@ def register_open_with(target_exe: Path):
 
     # --- 4. Per-Extension Registrations ---
     for ext in IMAGE_EXTENSIONS:
-        # Per-extension SystemFileAssociations shell
         ext_sfa_shell = rf"Software\Classes\SystemFileAssociations\{ext}\shell\SizeWiz"
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, ext_sfa_shell) as key:
             winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
             winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon_str)
-            winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
+            safe_delete_value(key, "MultiSelectModel")
 
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{ext_sfa_shell}\command") as key:
             winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
 
-        # OpenWithProgids & OpenWithList
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{ext}\OpenWithProgids") as key:
             winreg.SetValueEx(key, "SizeWiz.Image", 0, winreg.REG_SZ, "")
 
@@ -124,12 +125,11 @@ def register_open_with(target_exe: Path):
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{progid_path}\shell\open") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
-        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
+        safe_delete_value(key, "MultiSelectModel")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{progid_path}\shell\open\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
 
-    # Notify Windows Explorer of shell updates
     notify_shell_associations_changed()
 
 def register_uninstall_entry(target_dir: Path, target_exe: Path):
