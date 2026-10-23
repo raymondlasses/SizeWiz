@@ -1,8 +1,11 @@
-# SizeWiz
+<p align="center">
+  <img src="assets/icon.png" width="110" alt="SizeWiz Logo" /><br>
+  <h1 align="center">SizeWiz</h1>
+</p>
 
 <p align="center">
-  <b>Smart, lightweight, and snappy image downscaler/upscaler for Windows.</b><br>
-  Built for quick resizing via Windows Explorer's <i>"Open with"</i> menu or drag-and-drop.
+  <b>Smart, lightweight, and blazing-fast image downscaler & upscaler for Windows.</b><br>
+  Built for instant resizing via Windows Explorer's <i>"Open with"</i> menu, <b>Shift + Right-Click</b>, or drag-and-drop.
 </p>
 
 <p align="center">
@@ -10,6 +13,15 @@
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License MIT" />
   <img src="https://img.shields.io/badge/Formats-JPG%20%7C%20PNG%20%7C%20WEBP%20%7C%20AVIF-orange" alt="Supported Formats" />
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" alt="Python 3.10+" />
+</p>
+
+<p align="center">
+  <img src="assets/image_downscale.png" width="320" alt="SizeWiz Downscale Mode" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/image_upscale.png" width="320" alt="SizeWiz Upscale Mode" />
+</p>
+<p align="center">
+  <i>Downscale (Bounding Box) and Upscale (Minimum Bounds) with native Windows DWM dark/light title bar integration</i>
 </p>
 
 ---
