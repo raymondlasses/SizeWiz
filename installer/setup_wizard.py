@@ -72,9 +72,9 @@ class SetupWizard(ctk.CTk):
         self.source_dir = source_dir
 
         self.title("")
-        self.geometry("420x420")
+        self.geometry("420x480")
         self.resizable(False, False)
-        self._center_window(420, 420)
+        self._center_window(420, 480)
         self.after(50, self._apply_dwm)
 
         self._build_ui()
@@ -92,23 +92,47 @@ class SetupWizard(ctk.CTk):
 
     def _build_ui(self):
         container = ctk.CTkFrame(self, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=26, pady=20)
+        container.pack(fill="both", expand=True, padx=24, pady=16)
 
-        # Header
+        # 1. BOTTOM-DOCKING: Pack bottom elements first to guarantee visibility
+        self.status_label = ctk.CTkLabel(
+            container,
+            text="",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="gray",
+            height=16
+        )
+        self.status_label.pack(side="bottom", fill="x", pady=(2, 0))
+
+        self.install_btn = ctk.CTkButton(
+            container,
+            text="Install SizeWiz",
+            height=38,
+            corner_radius=8,
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            command=self._on_install
+        )
+        self.install_btn.pack(side="bottom", fill="x", pady=(8, 0))
+
+        # Progress bar (hidden initially, packed above button during install)
+        self.progress_bar = ctk.CTkProgressBar(container, height=6)
+        self.progress_bar.set(0)
+
+        # 2. TOP-DOCKING: Header, path selector, options
         self.title_label = ctk.CTkLabel(
             container,
             text="SizeWiz Setup",
-            font=ctk.CTkFont(family="Segoe UI Variable Display", size=22, weight="bold")
+            font=ctk.CTkFont(family="Segoe UI Variable Display", size=20, weight="bold")
         )
-        self.title_label.pack(pady=(0, 6))
+        self.title_label.pack(side="top", pady=(0, 2))
 
         self.subtitle_label = ctk.CTkLabel(
             container,
             text="Smart Image Resizer for Windows",
-            font=ctk.CTkFont(family="Segoe UI", size=12),
+            font=ctk.CTkFont(family="Segoe UI", size=11),
             text_color="gray"
         )
-        self.subtitle_label.pack(pady=(0, 16))
+        self.subtitle_label.pack(side="top", pady=(0, 12))
 
         # Install Path Section
         path_label = ctk.CTkLabel(
@@ -117,10 +141,10 @@ class SetupWizard(ctk.CTk):
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             anchor="w"
         )
-        path_label.pack(fill="x", pady=(0, 4))
+        path_label.pack(side="top", fill="x", pady=(0, 2))
 
         path_frame = ctk.CTkFrame(container, fg_color="transparent")
-        path_frame.pack(fill="x", pady=(0, 14))
+        path_frame.pack(side="top", fill="x", pady=(0, 12))
 
         self.path_entry = ctk.CTkEntry(
             path_frame,
@@ -147,7 +171,7 @@ class SetupWizard(ctk.CTk):
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
             anchor="w"
         )
-        opts_label.pack(fill="x", pady=(0, 4))
+        opts_label.pack(side="top", fill="x", pady=(0, 2))
 
         self.open_with_var = ctk.BooleanVar(value=True)
         self.start_menu_var = ctk.BooleanVar(value=True)
@@ -161,7 +185,7 @@ class SetupWizard(ctk.CTk):
             checkbox_width=18,
             checkbox_height=18
         )
-        self.cb_open_with.pack(anchor="w", pady=(0, 6))
+        self.cb_open_with.pack(side="top", anchor="w", pady=(0, 6))
 
         self.cb_start_menu = ctk.CTkCheckBox(
             container,
@@ -171,7 +195,7 @@ class SetupWizard(ctk.CTk):
             checkbox_width=18,
             checkbox_height=18
         )
-        self.cb_start_menu.pack(anchor="w", pady=(0, 6))
+        self.cb_start_menu.pack(side="top", anchor="w", pady=(0, 6))
 
         self.cb_desktop = ctk.CTkCheckBox(
             container,
@@ -181,34 +205,7 @@ class SetupWizard(ctk.CTk):
             checkbox_width=18,
             checkbox_height=18
         )
-        self.cb_desktop.pack(anchor="w", pady=(0, 14))
-
-        # Spacer
-        spacer = ctk.CTkFrame(container, fg_color="transparent")
-        spacer.pack(fill="both", expand=True)
-
-        # Progress bar (hidden initially)
-        self.progress_bar = ctk.CTkProgressBar(container, height=6)
-        self.progress_bar.set(0)
-
-        # Install Action Button
-        self.install_btn = ctk.CTkButton(
-            container,
-            text="Install SizeWiz",
-            height=38,
-            corner_radius=8,
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            command=self._on_install
-        )
-        self.install_btn.pack(fill="x")
-
-        self.status_label = ctk.CTkLabel(
-            container,
-            text="",
-            font=ctk.CTkFont(family="Segoe UI", size=11),
-            text_color="gray"
-        )
-        self.status_label.pack(pady=(4, 0))
+        self.cb_desktop.pack(side="top", anchor="w", pady=(0, 6))
 
     def _on_browse(self):
         chosen = filedialog.askdirectory(initialdir=self.path_entry.get().strip())
@@ -219,7 +216,7 @@ class SetupWizard(ctk.CTk):
     def _on_install(self):
         target_dir = Path(self.path_entry.get().strip()).resolve()
         self.install_btn.configure(state="disabled", text="Installing...")
-        self.progress_bar.pack(fill="x", pady=(0, 10))
+        self.progress_bar.pack(side="bottom", fill="x", pady=(0, 6))
         self.progress_bar.start()
 
         threading.Thread(
