@@ -48,6 +48,8 @@ def register_open_with(target_exe: Path):
     Registers SizeWiz in Windows HKCU registry for:
     1. Direct Right-Click Context Menu ("Resize with SizeWiz").
     2. Windows "Open with" recommended applications list.
+    3. Multi-file selection handling (MultiSelectModel="Player").
+    4. Windows SendTo shortcut.
     """
     exe_str = f'"{str(target_exe)}" "%1"'
     icon_str = f'"{str(target_exe)}",0'
@@ -57,7 +59,7 @@ def register_open_with(target_exe: Path):
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, sfa_shell_path) as key:
         winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
         winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon_str)
-        safe_delete_value(key, "MultiSelectModel")
+        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{sfa_shell_path}\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
@@ -68,7 +70,7 @@ def register_open_with(target_exe: Path):
         winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
         winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon_str)
         winreg.SetValueEx(key, "AppliesTo", 0, winreg.REG_SZ, APPLIES_TO_FILTER)
-        safe_delete_value(key, "MultiSelectModel")
+        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{all_shell_path}\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
@@ -83,7 +85,7 @@ def register_open_with(target_exe: Path):
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{app_base}\shell\open") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
-        safe_delete_value(key, "MultiSelectModel")
+        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{app_base}\shell\open\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
@@ -103,7 +105,7 @@ def register_open_with(target_exe: Path):
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, ext_sfa_shell) as key:
             winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
             winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon_str)
-            safe_delete_value(key, "MultiSelectModel")
+            winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
 
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{ext_sfa_shell}\command") as key:
             winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
@@ -125,10 +127,18 @@ def register_open_with(target_exe: Path):
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{progid_path}\shell\open") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, "Resize with SizeWiz")
-        safe_delete_value(key, "MultiSelectModel")
+        winreg.SetValueEx(key, "MultiSelectModel", 0, winreg.REG_SZ, "Player")
 
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{progid_path}\shell\open\command") as key:
         winreg.SetValue(key, "", winreg.REG_SZ, exe_str)
+
+    # --- 6. SendTo Shortcut (Provides instant multi-file right-click target) ---
+    try:
+        sendto_dir = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "SendTo"
+        if sendto_dir.exists():
+            create_shortcut(target_exe, sendto_dir / "SizeWiz.lnk", description="Resize with SizeWiz")
+    except Exception:
+        pass
 
     notify_shell_associations_changed()
 
@@ -182,5 +192,14 @@ def unregister_all():
     delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\Applications\SizeWiz.exe")
     delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Classes\SizeWiz.Image")
     delete_key_tree(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall\SizeWiz")
+
+    # Clean up SendTo shortcut
+    try:
+        sendto_dir = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "SendTo"
+        sendto_lnk = sendto_dir / "SizeWiz.lnk"
+        if sendto_lnk.exists():
+            sendto_lnk.unlink()
+    except Exception:
+        pass
 
     notify_shell_associations_changed()

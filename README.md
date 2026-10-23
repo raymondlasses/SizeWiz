@@ -28,7 +28,10 @@ Satisfying website upload constraints (e.g. *"Max dimensions: 1920x1080"* or *"M
 
 ## 🚀 Key Features
 
-* **Windows Explorer Integration**: Select 1 or more images anywhere $\rightarrow$ right-click $\rightarrow$ **Open with $\rightarrow$ SizeWiz**.
+* **Windows Explorer Context Menu & Multi-Select**:
+  * **Single Image**: Right-click $\rightarrow$ **Open with $\rightarrow$ SizeWiz** or **Resize with SizeWiz**.
+  * **Multiple Images**: Select 2 or more images $\rightarrow$ **Show more options** (`Shift + F10`) $\rightarrow$ **Resize with SizeWiz** (or **Send to $\rightarrow$ SizeWiz**).
+  * **Single-Instance Mutex & Bundling**: Even when Windows launches multiple processes in parallel, SizeWiz atomically groups all selected files into **a single window**!
 * **Zero-Distortion Aspect Ratio**:
   * **Downscale Mode**: Proportionally fits the image inside `Max Width × Max Height`. Never crops or stretches.
   * **Upscale Mode**: Scales the image up to satisfy **both** `Min Width` and `Min Height` requirements while strictly preserving aspect ratio.
@@ -63,6 +66,19 @@ Download the latest **`SizeWiz_v1_Setup.exe`** from [GitHub Releases](https://gi
 
 ### Option 2: Portable (No Installation)
 Download **`SizeWiz_v1_Portable.zip`**, extract it anywhere, and launch `SizeWiz.exe` directly.
+
+---
+
+## 💡 Windows 11 Context Menu Tip
+
+In Windows 11, Microsoft hides classic Win32 context menu entries behind the *"Show more options"* (`Shift + F10`) layer, and hides *"Open with"* when selecting multiple files.
+
+If you prefer having the full classic context menu appear immediately on your first right-click in Windows 11, you can restore it globally with one command:
+```powershell
+reg.exe add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /f /ve
+taskkill /f /im explorer.exe; start explorer.exe
+```
+*(To revert back to Windows 11's default menu later, simply run `reg.exe delete "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" /f`)*
 
 ---
 

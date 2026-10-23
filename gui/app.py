@@ -142,6 +142,19 @@ class SizeWizApp(ctk.CTk, TkinterDnD.DnDWrapper if HAS_TKDND else object):
                     text_color="#e74c3c"
                 )
 
+    def bring_to_front(self):
+        """Brings the application window to the foreground."""
+        def _focus():
+            try:
+                self.deiconify()
+                self.lift()
+                self.focus_force()
+                self.attributes("-topmost", True)
+                self.after(100, lambda: self.attributes("-topmost", False))
+            except Exception:
+                pass
+        self.after(0, _focus)
+
     def add_files_from_external(self, new_paths: List[str]):
         """Callback for IPC socket when Windows Explorer forwards files."""
         self._filter_and_add_files(new_paths)
@@ -150,6 +163,7 @@ class SizeWizApp(ctk.CTk, TkinterDnD.DnDWrapper if HAS_TKDND else object):
                 self.after(0, self._transition_to_main_ui)
             else:
                 self.after(0, self._update_file_count_display)
+        self.bring_to_front()
 
     def _build_drop_ui(self):
         # Header
