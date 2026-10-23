@@ -73,6 +73,7 @@ def main():
     cmd_setup = (
         f'pyinstaller --noconfirm --onefile --windowed '
         f'--name "{setup_name}" '
+        f'--paths . '
         f'--collect-all customtkinter '
         f'--add-data "{str(payload_zip)};." '
         f'installer/setup_wizard.py'

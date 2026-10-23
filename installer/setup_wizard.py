@@ -4,16 +4,39 @@ import shutil
 import threading
 import time
 from pathlib import Path
+
+# Ensure root directory and PyInstaller bundle directory are in sys.path
+root_dir = Path(__file__).resolve().parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
+
+meipass = getattr(sys, "_MEIPASS", None)
+if meipass and meipass not in sys.path:
+    sys.path.insert(0, meipass)
+
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 
-from installer.registry import (
-    register_open_with,
-    register_uninstall_entry,
-    create_shortcut,
-    unregister_all
-)
-from gui.window_utils import apply_titlebar_styling
+try:
+    from installer.registry import (
+        register_open_with,
+        register_uninstall_entry,
+        create_shortcut,
+        unregister_all
+    )
+except ImportError:
+    from registry import (
+        register_open_with,
+        register_uninstall_entry,
+        create_shortcut,
+        unregister_all
+    )
+
+try:
+    from gui.window_utils import apply_titlebar_styling
+except ImportError:
+    def apply_titlebar_styling(window, is_dark: bool = True):
+        pass
 
 ctk.set_appearance_mode("system")
 ctk.set_default_color_theme("blue")
